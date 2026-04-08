@@ -1,0 +1,546 @@
+
+
+
+
+Emacs has some sort of canvas/graphics support.  What can I do with it?  I've seen other add decorations to the status/mode line and/or minibuffer, like animated flames; I've seen very ornate fonts (like medieval manuscript decorative block letters).  I'm more interested in producing PaperBanana styled presentation, especially in menus.  Also, I want to be able to view charts, graphs, plots, SVG, animated gifs.  Ideally I could embed a browser toolkit that can show JS or WASM apps running integrated with (seemless within) and emacs buffer.  How can I create demos of all of these?  elisp is fine for some demos, but if we need to I can add (GPL-compatible) Rust extensions callable from Lisp to do FFI calls to C libraries as needed.
+
+
+Thought for 8s
+
+Thought
+
+Thought
+
+Thought
+
+Thought
+You can do quite a lot, but it helps to separate four layers of “graphics in Emacs” because they have very different tradeoffs:
+
+1. What Emacs can natively do well
+At the built-in level, Emacs can:
+
+render images in buffers, including PNG, JPEG, GIF, TIFF, WebP, and SVG when the build has the needed support;
+
+handle multi-frame images, including animated GIFs;
+
+generate and manipulate SVG programmatically from Elisp via svg.el;
+
+embed certain native widgets via xwidgets, including WebKit on builds that support it;
+
+load dynamic modules from shared libraries, which means you can bridge to C libraries and, indirectly, Rust via C ABI wrappers. 
+
+That means your wish list is mostly feasible, but not all through the same mechanism.
+
+2. Best-fit architecture for your goals
+Given what you want, I would use this stack:
+
+A. Decorative UI inside normal text buffers
+Use SVG overlays / inline images / text properties / header-line / mode-line / minibuffer.
+
+This is the right layer for:
+
+PaperBanana-style badges, labels, panels, arrows, icons
+
+decorated completion candidates
+
+menu-like visual blocks
+
+ornate initials / drop caps / manuscript-like headings
+
+animated status widgets, progress bars, “flame” style effects
+
+The core tools here are Emacs faces, overlays, display properties, and especially svg.el, plus packages like svg-lib, which is explicitly aimed at creating SVG tags, icons, buttons, progress bars, pies, and similar buffer-friendly objects. 
+
+B. Charts / graphs / plots
+Use Org + gnuplot for static and reproducible plots, or generate SVG directly from Elisp for lightweight custom charts.
+
+Org’s manual support for plotting tables with gnuplot is real and convenient. For presentations and demos, it is a very good path because the source data can live in the same Org document as the narrative. 
+
+C. Viewing SVG, GIF, images
+Use Emacs image rendering directly in buffers. That part is straightforward and already supported. Animated GIFs are handled as multi-frame images. 
+
+D. Embedded browser / JS / WASM apps
+This is the tricky part.
+
+You have three realistic choices:
+
+xwidgets/WebKit
+Officially documented, but build- and platform-dependent, and in practice historically fragile. The Emacs manual documents it, but recent bug traffic shows reliability concerns with newer WebKitGTK combinations. 
+
+EAF (Emacs Application Framework)
+This is the most feature-rich “live app inside Emacs” path today: browser, PDF, video, maps, etc., by combining Elisp with Python/Qt/JS. It is not built into Emacs, but it is designed exactly for the “live graphical app in Emacs” use case. 
+
+Dynamic module approach
+Build your own module or wrapper for a toolkit. This gives you maximum control, but also the most engineering work. Official Emacs dynamic modules are supported; the API is C-based, so Rust normally comes in through a C ABI boundary. 
+
+For your goals, I would not start with xwidgets as the main foundation. I would treat it as an experiment only.
+
+3. What I would recommend for each of your demo categories
+A. PaperBanana-style presentation menus
+Best approach
+Build a small Elisp UI framework that renders “slides” or “menu cards” as SVG fragments embedded inline in a buffer.
+
+Why this is the best fit:
+
+stays native to Emacs buffers;
+
+works with keyboard navigation naturally;
+
+easier to style than trying to coerce a browser widget into looking like Emacs;
+
+export path is good because SVG is already a presentation-ready format;
+
+you can gradually add animation by replacing images or re-rendering sections.
+
+Building blocks
+svg.el for boxes, callouts, arrows, badges, panels, backgrounds
+
+overlays with display property
+
+line-spacing, face remapping, variable-pitch if desired
+
+clickable regions via keymaps and text properties
+
+optional svg-lib for badges, pills, progress items, icons 
+
+Good first demos
+a PaperBanana-style launcher menu
+
+a slide title page with decorative block letter
+
+a decision tree menu with arrows and boxes
+
+a kanban/status panel in a buffer
+
+a mini dashboard in the minibuffer or header-line
+
+B. Decorative mode line / minibuffer / completion UI
+This is already a well-trodden path. Packages like nano-modeline and svg-tag-mode show the general approach: replace plain text with compact visual objects. 
+
+Best approach
+Use:
+
+header-line-format or mode-line-format
+
+text properties with display
+
+SVG badges/icons
+
+hooks/timers for animation
+
+Example uses
+flame/heat indicator for CPU load or git churn
+
+badge-style project labels
+
+pie/progress indicator in mode line
+
+decorative minibuffer prompt blocks
+
+medieval illuminated initial at top of menu buffer
+
+Caveat
+Mode line and minibuffer are constrained spaces. PaperBanana styling works better in:
+
+dedicated menu buffers,
+
+child frames,
+
+posframe-like popups,
+
+header-line strips,
+than in the classic single-line mode line.
+
+C. Charts, graphs, plots
+You specifically want charts/plots and also demos.
+
+Recommended split
+reproducible data-driven plots: Org + gnuplot
+
+UI-integrated microcharts: SVG generated from Elisp
+
+heavy interactive plotting: browser view via EAF or external browser
+
+Org plot is ideal for “presentation material generated from tables.” 
+
+Demo ideas
+sparkline in mode line
+
+bar chart in a menu buffer
+
+PCA scatter plot exported to SVG and viewed inline
+
+org table + gnuplot -> inline image
+
+slide showing plot + bullet narrative in same Org document
+
+D. SVG viewing
+This is one of Emacs’s stronger built-in graphics capabilities. Emacs has explicit SVG support, and svg.el lets you create SVG objects yourself. 
+
+Demo ideas
+generate an SVG flowchart entirely from Elisp
+
+render a dependency graph from Org headings
+
+create a PaperBanana title card as SVG
+
+inline icon library for menu commands
+
+E. Animated GIFs
+Yes, Emacs can display multi-frame GIFs. The built-in image support covers that. 
+
+Good uses
+small decorative motion
+
+status animation
+
+embedded demo clip
+
+Not ideal for
+rich interaction
+
+serious presentation animation
+
+video-like embedding
+
+For those, EAF is a better fit. 
+
+F. Embedded browser / JS / WASM app seamlessly in Emacs
+Official path: xwidgets
+Emacs documents embedded widgets and WebKit integration. You can create xwidgets and handle xwidget events, and commands like xwidget-webkit-browse-url exist when the build supports them. 
+
+Practical warning
+This is where the gap between “possible” and “pleasant” matters. Recent bug discussion indicates WebKitGTK combinations can crash Emacs, and xwidgets have long been seen as dependency-heavy and awkward. 
+
+Better practical path: EAF
+EAF is explicitly designed to host graphical apps in Emacs using Elisp + Python + Qt + browser tech, and it already has browser, PDF, video, map, and other app integrations. 
+
+My recommendation
+For “seamless JS/WASM inside Emacs”:
+
+Demo/prototype quickly: use EAF
+
+Stay close to core Emacs: experiment with xwidgets, but expect friction
+
+Long-term custom product: consider a dynamic module plus your own rendering protocol
+
+4. Where Rust fits
+Rust fits best in two roles:
+
+Role 1: generator / renderer backend
+Have Rust generate:
+
+SVG
+
+PNG/WebP
+
+plot data
+
+layout JSON
+
+WASM app assets
+
+Then let Elisp display the result.
+
+This is the lowest-risk Rust integration.
+
+Role 2: dynamic module
+Use a C ABI layer so Emacs can call into your Rust-implemented shared library. Emacs’s official module API is C-oriented, but that does not prevent a Rust implementation behind the ABI. 
+
+I would avoid
+Starting by embedding a huge browser toolkit yourself. That is the most expensive path.
+
+5. Concrete demo roadmap
+If your goal is to create demos of all these capabilities, I would do them in this order.
+
+Phase 1: native, reliable, buffer-centric
+SVG badge demo
+
+inline colored tags in a text buffer
+
+use svg-lib or raw svg.el
+
+PaperBanana menu demo
+
+a special major mode
+
+title block, menu cards, arrows, icons
+
+keyboard navigation
+
+Mini chart demo
+
+render bar chart / sparkline as SVG in buffer
+
+Animated status demo
+
+timer updates a header-line or side panel
+
+Image viewer demo
+
+show PNG/SVG/GIF in a normal buffer
+
+This phase gives you immediate wins and stays mostly pure Elisp. Supported by Emacs’s built-in image/SVG stack and ELPA packages. 
+
+Phase 2: reproducible content
+Org + gnuplot demo
+
+table -> plot
+
+narrative and plot in same file
+
+exportable slide fragments
+
+This is the cleanest path for “presentation as code.” 
+
+Phase 3: browser/app embedding
+EAF browser demo
+
+load a local HTML/JS/WASM demo app into Emacs
+
+prove interactive embedding
+
+xwidget proof-of-concept
+
+only if your Emacs build supports it and behaves acceptably
+
+Phase 4: Rust-backed power features
+Rust SVG/layout engine
+
+Rust computes layout, Elisp displays SVG
+
+Rust module for fast rendering / graph layout / charting
+
+only after the UI model is settled
+
+6. Pros and cons of the main approaches
+Approach	Best for	Strengths	Risks
+Pure Elisp + faces/overlays	menus, decorations, status UI	native, portable, hackable	limited for heavy interactivity
+svg.el / svg-lib	PaperBanana visuals, inline widgets	very good visual payoff	layout logic gets custom quickly
+Org + gnuplot	charts, reproducible slides	literate workflow, stable	not ideal for rich live interaction
+xwidgets	official embedded web widget path	built into Emacs when enabled	build/platform fragility, crash risk
+EAF	browser/PDF/video/web apps	broad capabilities now	extra stack: Python/Qt/etc.
+Rust dynamic module	performance, native libraries	powerful, flexible	most engineering complexity
+7. My actual recommendation for you
+For your specific interests, I would build a small Emacs package family with this shape:
+
+pb-menu.el
+PaperBanana-style menu renderer using:
+
+buffer-local overlays
+
+SVG panels
+
+keymaps on text regions
+
+optional animation timer
+
+pb-chart.el
+Tiny chart generator:
+
+sparkline
+
+bars
+
+scatter
+
+arrow diagrams
+
+export to SVG string
+
+pb-present.el
+Presentation mode:
+
+one slide per heading or section
+
+inline SVG figures
+
+key-driven navigation
+
+export path to standalone SVG/HTML
+
+pb-web.el
+Integration layer:
+
+EAF if installed
+
+xwidget fallback if available
+
+external browser fallback otherwise
+
+pb-rs optional backend
+Rust helper for:
+
+graph layout
+
+PCA scatter layout
+
+SVG text wrapping
+
+font metrics or more advanced shape generation
+
+That gives you a clean ladder:
+Elisp first, Rust only where it buys something real.
+
+8. Minimal demo snippets to start with
+Demo 1: inline SVG in a buffer
+(require 'svg)
+
+(defun mike/demo-svg-buffer ()
+  (interactive)
+  (let* ((buf (get-buffer-create "*demo-svg*"))
+         (svg (svg-create 420 120 :stroke-width 2 :stroke "#333"))
+         (img nil))
+    (svg-rectangle svg 10 10 400 100 :rx 14 :ry 14 :fill "#fdf6e3" :stroke "#586e75")
+    (svg-text svg "PaperBanana Demo" :x 24 :y 42
+              :font-size 24 :font-weight "bold" :fill "#073642")
+    (svg-text svg "Menu card rendered as inline SVG" :x 24 :y 78
+              :font-size 14 :fill "#586e75")
+    (setq img (svg-image svg :ascent 'center))
+    (with-current-buffer buf
+      (read-only-mode -1)
+      (erase-buffer)
+      (insert-image img)
+      (insert "\n\nThis is regular text below the SVG card.\n")
+      (special-mode))
+    (pop-to-buffer buf)))
+Demo 2: animated header line
+(defvar mike/demo-flame-phase 0)
+(defvar mike/demo-flame-timer nil)
+
+(defun mike/demo-flame-frame ()
+  (let* ((frames ["▁" "▂" "▃" "▄" "▅" "▆" "▇" "█" "▇" "▆" "▅" "▄" "▃" "▂"])
+         (i (mod mike/demo-flame-phase (length frames))))
+    (setq mike/demo-flame-phase (1+ mike/demo-flame-phase))
+    (format " Heat %s%s%s "
+            (aref frames i)
+            (aref frames (mod (+ i 3) (length frames)))
+            (aref frames (mod (+ i 6) (length frames))))))
+
+(defun mike/demo-flame-start ()
+  (interactive)
+  (setq mike/demo-flame-timer
+        (run-at-time 0 0.15
+                     (lambda ()
+                       (setq-default header-line-format
+                                     '((:eval (propertize (mike/demo-flame-frame)
+                                                          'face 'mode-line-emphasis))))
+                       (force-mode-line-update t)))))
+
+(defun mike/demo-flame-stop ()
+  (interactive)
+  (when mike/demo-flame-timer
+    (cancel-timer mike/demo-flame-timer)
+    (setq mike/demo-flame-timer nil))
+  (setq-default header-line-format nil)
+  (force-mode-line-update t))
+Demo 3: Org plot
+| x | y |
+|---+---|
+| 1 | 3 |
+| 2 | 5 |
+| 3 | 4 |
+| 4 | 7 |
+| 5 | 9 |
+
+#+PLOT: title:"Demo Plot" ind:1 type:2d with:lines
+Then run M-x org-plot/gnuplot. Org officially supports plotting Org tables through gnuplot. 
+
+Demo 4: animated GIF / image viewer
+(defun mike/demo-open-image (file)
+  (interactive "fImage file: ")
+  (let ((buf (get-buffer-create "*demo-image*")))
+    (with-current-buffer buf
+      (read-only-mode -1)
+      (erase-buffer)
+      (insert-image (create-image file))
+      (image-mode))
+    (pop-to-buffer buf)))
+Demo 5: xwidget availability check
+(defun mike/demo-xwidget-check ()
+  (interactive)
+  (message "xwidgets available: %S"
+           (featurep 'xwidget-internal)))
+If available, M-x xwidget-webkit-browse-url is the usual starting point. Official docs cover xwidgets, but in practice reliability varies by build and platform. 
+
+9. Bottom line
+The most productive path is:
+
+Use Elisp + SVG first for menus, PaperBanana visuals, decorations, minibuffer/status UI.
+
+Use Org + gnuplot for charts and reproducible presentation content.
+
+Use built-in image support for SVG/GIF/image viewing.
+
+Use EAF when you need “real embedded app/browser/video/PDF”.
+
+Use Rust modules later only where performance or external libraries justify the complexity.
+
+Treat xwidgets as optional and experimental, not as your foundation. 
+
+I can turn this into a concrete starter package layout with pb-menu.el, pb-chart.el, and pb-present.el, plus a few working demo commands.
+
+
+please provide a downloadable zip of el files and document the commands
+
+
+Thought for 3m 20s
+I created the zip and included a README with the commands.
+
+Download: pb-emacs-demo.zip
+
+What’s inside
+pb-menu.el
+
+pb-chart.el
+
+pb-media.el
+
+pb-web.el
+
+pb-present.el
+
+pb-demo-init.el
+
+README.md
+
+Fastest way to try it
+In Emacs:
+
+(add-to-list 'load-path "/path/to/pb-emacs-demo")
+(require 'pb-demo-init)
+Then run:
+
+M-x pb-demo-help
+Main commands
+M-x pb-menu-demo
+M-x pb-menu-illuminated-demo
+M-x pb-chart-bar-demo
+M-x pb-chart-sparkline-demo
+M-x pb-chart-scatter-demo
+M-x pb-media-open-image
+M-x pb-media-header-heat-start
+M-x pb-media-header-heat-stop
+M-x pb-present-demo
+M-x pb-web-status
+M-x pb-web-browse-url
+M-x pb-web-open-local-file
+Presentation keys
+Inside M-x pb-present-demo:
+
+n  next slide
+p  previous slide
+g  redraw
+q  quit window
+Notes
+SVG demos need SVG support in your Emacs build.
+
+pb-web-browse-url prefers xwidgets if available, then EAF if loaded, then falls back to the normal browser.
+
+pb-media-open-image is useful for SVG, PNG, GIF, and other formats your build supports.
+
+I can also make a second zip with a more opinionated pb-org-present.el that renders slides from Org headings.
+
+
+
+
